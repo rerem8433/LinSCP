@@ -1,8 +1,8 @@
 <p align="center"># LinSCP</p>
 
-<p **🇫🇷 Client SFTP / SCP / FTP / FTPS natif pour Linux, inspiré de WinSCP.**</p>
+<p align="center">**🇫🇷 Client SFTP / SCP / FTP / FTPS natif pour Linux, inspiré de WinSCP.**</p>
 
-<p **🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**</p>
+<p align="center">**🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**</p>
 
 <p align="center">Thème clair</p>
 
@@ -14,7 +14,7 @@
 
 ---
 
-## 🇫🇷 Français
+<p align="center">## 🇫🇷 Français</p>
 
 LinSCP n'est **pas** WinSCP sous Wine : c'est une réécriture complète en Python + Qt 6. Elle garde l'essentiel de WinSCP et laisse de côté le superflu.
 
@@ -55,7 +55,7 @@ Les dépendances (`python3-pyqt6`, `python3-pyqt6.qtsvg`, `python3-paramiko`, `p
 
 ---
 
-## 🇬🇧 English
+<p align="center">## 🇬🇧 English</p>
 
 LinSCP is **not** WinSCP running in Wine: it is a from-scratch rewrite in Python + Qt 6 that keeps WinSCP's essentials and drops the clutter.
 
