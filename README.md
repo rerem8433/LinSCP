@@ -1,8 +1,8 @@
-# LinSCP
+<p align="center"># LinSCP</p>
 
-**🇫🇷 Client SFTP / SCP / FTP / FTPS natif pour Linux, inspiré de WinSCP.**
+<p **🇫🇷 Client SFTP / SCP / FTP / FTPS natif pour Linux, inspiré de WinSCP.**</p>
 
-**🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**
+<p **🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**</p>
 
 <p align="center">Thème clair</p>
 
