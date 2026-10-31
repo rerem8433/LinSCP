@@ -4,7 +4,12 @@
 
 **🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**
 
+Thème clair
 ![LinSCP](docs/screenshot-light.png)
+
+Thème sombre
+
+![LinSCP dark](docs/screenshot-dark.png)
 
 ---
 
@@ -81,7 +86,5 @@ python3 -m linscp
 ```
 
 ---
-
-![LinSCP dark](docs/screenshot-dark.png)
 
 GPL-3.0 · © ParadoxXx Squad · LinSCP is not affiliated with the WinSCP project.
