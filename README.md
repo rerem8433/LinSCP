@@ -4,7 +4,7 @@
 
 **🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**
 
-Thème clair
+[c]Thème clair[c/]
 ![LinSCP](docs/screenshot-light.png)
 
 Thème sombre
