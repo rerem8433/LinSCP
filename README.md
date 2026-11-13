@@ -24,7 +24,7 @@ LinSCP n'est **pas** WinSCP sous Wine : c'est une réécriture complète en Pyth
 
 ### Installation (Linux Mint 21+ / Ubuntu 22.04+ / Debian 12+)
 ```bash
-sudo apt install ./linscp_1.0.1_all.deb
+sudo apt install ./linscp_1.0.3_all.deb
 ```
 Le .deb est dans les [Releases](https://github.com/rerem8433/LinSCP/releases). Les dépendances (`python3-pyqt6`, `python3-pyqt6.qtsvg`, `python3-paramiko`, `python3-keyring`) sont installées automatiquement.
 
@@ -65,7 +65,7 @@ LinSCP is **not** WinSCP running in Wine: it is a from-scratch rewrite in Python
 
 ### Install (Linux Mint 21+ / Ubuntu 22.04+ / Debian 12+)
 ```bash
-sudo apt install ./linscp_1.0.1_all.deb
+sudo apt install ./linscp_1.0.3_all.deb
 ```
 
 ### Build the package

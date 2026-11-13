@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
-                             QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
+                             QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit,
+                             QPushButton,
                              QToolButton, QVBoxLayout, QWidget)
 
 from ..i18n import tr
@@ -85,10 +86,12 @@ class SiteManager(QDialog):
         self.f_auth.addItem(tr("Clé SSH"), "key")
         self.f_pass = QLineEdit()
         self.f_pass.setEchoMode(QLineEdit.EchoMode.Password)
-        self.f_save = QCheckBox(tr("Mémoriser dans le trousseau du système"))
-        if not HAVE_KEYRING:
-            self.f_save.setEnabled(False)
-            self.f_save.setToolTip(tr("Aucun trousseau (Secret Service) disponible : le mot de passe sera demandé à chaque connexion."))
+        if HAVE_KEYRING:
+            self.f_save = QCheckBox(tr("Mémoriser dans le trousseau du système"))
+        else:
+            self.f_save = QCheckBox(tr("Mémoriser le mot de passe"))
+            self.f_save.setToolTip(tr("Aucun trousseau système détecté : le mot de passe est rangé dans "
+                                      "~/.config/linscp/passwords.json (lisible par vous seul, masqué mais non chiffré)."))
         self.f_key = QLineEdit()
         self.f_key.setPlaceholderText(tr("Vide = clés de ~/.ssh et agent SSH"))
         kb = QToolButton()
@@ -113,6 +116,10 @@ class SiteManager(QDialog):
         lh.addWidget(lbtn)
         self.f_passive = QCheckBox(tr("Mode passif (recommandé)"))
         self.f_passive.setChecked(True)
+        self.f_notes = QPlainTextEdit()
+        self.f_notes.setPlaceholderText(tr("Notes libres : identifiants du panel, emplacement, remarques…"))
+        self.f_notes.setTabChangesFocus(True)
+        self.f_notes.setFixedHeight(84)
 
         self.l_auth = QLabel(tr("Authentification"))
         self.l_pass = QLabel(tr("Mot de passe"))
@@ -129,12 +136,14 @@ class SiteManager(QDialog):
         form.addRow(tr("Dossier distant"), self.f_rdir)
         form.addRow(tr("Dossier local"), lh)
         form.addRow(self.l_passive, self.f_passive)
+        form.addRow(tr("Notes"), self.f_notes)
 
         for w in (self.f_name, self.f_host, self.f_user, self.f_pass, self.f_key, self.f_rdir, self.f_ldir):
             w.textEdited.connect(self._touch)
         self.f_port.textEdited.connect(self._touch)
         self.f_save.toggled.connect(self._touch)
         self.f_passive.toggled.connect(self._touch)
+        self.f_notes.textChanged.connect(self._touch)
         self.f_proto.currentIndexChanged.connect(self._proto_changed)
         self.f_auth.currentIndexChanged.connect(self._auth_changed)
 
@@ -142,7 +151,9 @@ class SiteManager(QDialog):
         bottom = QHBoxLayout()
         bottom.addStretch(1)
         self.b_save = QPushButton(icons.icon("save"), tr("Enregistrer"))
-        self.b_save.clicked.connect(self._save)
+        # lambda: clicked(bool) would otherwise land in _save's "reload" argument as False,
+        # so the list was never refreshed and the save looked like it had failed
+        self.b_save.clicked.connect(lambda: self._save(confirm=True))
         self.b_conn = QPushButton(icons.icon("connect", "#FFFFFF"), tr("Connexion"))
         self.b_conn.setProperty("accent", True)
         self.b_conn.setDefault(True)
@@ -173,7 +184,10 @@ class SiteManager(QDialog):
         for sid, s in self.store.ordered():
             it = QListWidgetItem(icons.icon("server"), s.label())
             it.setData(Qt.ItemDataRole.UserRole, sid)
-            it.setToolTip(f"{proto_label(s.protocol)} · {s.user + '@' if s.user else ''}{s.host}:{s.effective_port()}")
+            tip = f"{proto_label(s.protocol)} · {s.user + '@' if s.user else ''}{s.host}:{s.effective_port()}"
+            if s.notes:
+                tip += "\n\n" + s.notes
+            it.setToolTip(tip)
             self.list.addItem(it)
         self.list.blockSignals(False)
         target = select or self.cur
@@ -213,11 +227,12 @@ class SiteManager(QDialog):
         self.f_user.setText(s.user)
         self.f_auth.setCurrentIndex(1 if s.auth == "key" else 0)
         self.f_pass.setText(pw)
-        self.f_save.setChecked(s.save_password and HAVE_KEYRING)
+        self.f_save.setChecked(s.save_password)
         self.f_key.setText(s.key_file)
         self.f_rdir.setText(s.remote_dir)
         self.f_ldir.setText(s.local_dir)
         self.f_passive.setChecked(s.passive)
+        self.f_notes.setPlainText(s.notes)
         self._loading = False
         self._dirty = False
         self._update_rows()
@@ -259,7 +274,7 @@ class SiteManager(QDialog):
                  auth=self.f_auth.currentData() if self.f_proto.currentData() in ("sftp", "scp") else "password",
                  key_file=self.f_key.text().strip(), remote_dir=self.f_rdir.text().strip(),
                  local_dir=self.f_ldir.text().strip(), passive=self.f_passive.isChecked(),
-                 save_password=self.f_save.isChecked())
+                 save_password=self.f_save.isChecked(), notes=self.f_notes.toPlainText().rstrip())
         port = int(self.f_port.text().strip() or 0)
         s.port = 0 if port == s.default_port() else port
         s.password = self.f_pass.text()
@@ -306,7 +321,7 @@ class SiteManager(QDialog):
             return False
         return True
 
-    def _save(self, reload=True):
+    def _save(self, reload=True, confirm=False):
         s = self._site_from_form()
         if not self._validate(s):
             return None
@@ -314,6 +329,9 @@ class SiteManager(QDialog):
         self._dirty = False
         if reload:
             self._reload(self.cur)
+        if confirm:
+            self.b_save.setText(tr("Enregistré ✓"))
+            QTimer.singleShot(1500, lambda: self.b_save.setText(tr("Enregistrer")))
         return s
 
     def _connect(self):

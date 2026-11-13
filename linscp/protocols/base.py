@@ -72,6 +72,7 @@ class Site:
     local_dir: str = ""
     passive: bool = True
     save_password: bool = False
+    notes: str = ""
     password: str = field(default="", repr=False, compare=False)
 
     def default_port(self) -> int:

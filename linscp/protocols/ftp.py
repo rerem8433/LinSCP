@@ -29,10 +29,32 @@ def _tls_context() -> ssl.SSLContext:
     return ctx
 
 
+def _open_data(ftp, cmd, rest=None):
+    """Open the data connection. If the server answers 425 (it cannot reach us in active
+    mode, or our passive connection failed), switch active <-> passive once and retry."""
+    try:
+        return ftplib.FTP.ntransfercmd(ftp, cmd, rest)
+    except (ftplib.error_temp, OSError) as e:
+        if getattr(ftp, "_mode_switched", False):
+            raise
+        refused_active = isinstance(e, ftplib.error_temp) and str(e).startswith("425")
+        failed_passive = not isinstance(e, ftplib.Error) and ftp.passiveserver
+        if not (refused_active or failed_passive):
+            raise
+        ftp._mode_switched = True
+        ftp.set_pasv(not ftp.passiveserver)
+        return ftplib.FTP.ntransfercmd(ftp, cmd, rest)
+
+
+class _PlainFTP(ftplib.FTP):
+    def ntransfercmd(self, cmd, rest=None):
+        return _open_data(self, cmd, rest)
+
+
 class _ExplicitTLS(ftplib.FTP_TLS):
     def ntransfercmd(self, cmd, rest=None):
         # Reuse the control-channel TLS session on data channels (vsftpd/ProFTPD require it)
-        conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
+        conn, size = _open_data(self, cmd, rest)
         if self._prot_p:
             sess = getattr(self.sock, "session", None)
             conn = self.context.wrap_socket(conn, server_hostname=self.host, session=sess)
@@ -94,7 +116,7 @@ class FTPFS(RemoteFS):
         s = self.site
         proto = s.protocol
         if proto == "ftp":
-            ftp = ftplib.FTP(timeout=20)
+            ftp = _PlainFTP(timeout=20)
         elif proto == "ftps":
             ftp = _ExplicitTLS(context=_tls_context(), timeout=20)
         else:

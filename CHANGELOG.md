@@ -5,6 +5,36 @@ All notable changes to LinSCP are documented here.
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · Versions : [SemVer](https://semver.org/lang/fr/)
 
+## [1.0.3] — 2026-11-13
+
+### 🇫🇷 Corrigé
+- Gestionnaire de sites : la case « Mémoriser le mot de passe » restait grisée quand LinSCP ne trouvait pas le trousseau du système (`python3-keyring` absent ou aucun service Secret Service). Elle est maintenant toujours active.
+- Sans trousseau, le mot de passe est rangé dans `~/.config/linscp/passwords.json` : fichier lisible par l'utilisateur seul (droits 600), mot de passe masqué mais non chiffré, comme le fait WinSCP par défaut.
+- Si le trousseau refuse l'enregistrement (verrouillé…), LinSCP passe aussi par ce fichier.
+- Paquet : `python3-secretstorage` et `gnome-keyring` / `kwalletmanager` ajoutés aux paquets recommandés.
+
+### 🇬🇧 Fixed
+- Site manager: "Remember password" stayed greyed out when LinSCP found no system keyring (`python3-keyring` missing or no Secret Service running). It is now always enabled.
+- Without a keyring, the password is kept in `~/.config/linscp/passwords.json`: file readable by the user only (mode 600), password obfuscated but not encrypted, as WinSCP does by default.
+- If the keyring refuses to store it (locked…), LinSCP also falls back to that file.
+- Package: `python3-secretstorage` and `gnome-keyring` / `kwalletmanager` added to Recommends.
+
+## [1.0.2] — 2026-11-13
+
+### 🇫🇷 Ajouté
+- Gestionnaire de sites : champ **Notes** libre (plusieurs lignes) sur chaque fiche. Les notes s'affichent au survol d'un site et sont prises en compte par la recherche.
+
+### 🇫🇷 Corrigé
+- Gestionnaire de sites : le bouton **Enregistrer** sauvegardait bien la fiche, mais la liste n'était pas rafraîchie, si bien que l'enregistrement semblait avoir échoué. Le bouton affiche maintenant « Enregistré ✓ ».
+- FTP : l'erreur « 425 Can't build data connection » apparaissait quand le serveur ne peut pas joindre le PC en mode actif (NAT, box). LinSCP bascule maintenant tout seul en mode passif, et inversement si le mode passif échoue.
+
+### 🇬🇧 Added
+- Site manager: free multi-line **Notes** field on each entry. Notes show in the site tooltip and are matched by the search box.
+
+### 🇬🇧 Fixed
+- Site manager: **Save** did store the entry but never refreshed the list, so saving looked like it had failed. The button now shows "Saved ✓".
+- FTP: the "425 Can't build data connection" error appeared when the server cannot reach the PC in active mode (NAT, ISP box). LinSCP now switches to passive mode automatically, and back to active if passive fails.
+
 ## [1.0.1] — 2026-11-13
 
 ### 🇫🇷 Corrigé
@@ -68,5 +98,7 @@ Première version publique. / First public release.
 - FTPS implicite pas encore testé contre un vrai serveur. / Implicit FTPS not yet tested against a real server.
 - Le changement de langue et de thème est complet au redémarrage. / Language and theme changes fully apply after a restart.
 
+[1.0.3]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.3
+[1.0.2]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.2
 [1.0.1]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.1
 [1.0.0]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.0

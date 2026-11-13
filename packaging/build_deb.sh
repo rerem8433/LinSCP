@@ -64,7 +64,7 @@ Priority: optional
 Architecture: all
 Installed-Size: $SIZE
 Depends: python3 (>= 3.10), python3-pyqt6, python3-pyqt6.qtsvg, python3-paramiko
-Recommends: python3-keyring
+Recommends: python3-keyring, python3-secretstorage, gnome-keyring | kwalletmanager
 Maintainer: ParadoxXx Squad <rerem8433@users.noreply.github.com>
 Homepage: https://github.com/rerem8433/LinSCP
 Description: Native SFTP / SCP / FTP / FTPS client for Linux

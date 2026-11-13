@@ -14,7 +14,8 @@ KEYRING_SERVICE = "LinSCP"
 try:
     import keyring  # type: ignore
     from keyring.backends import fail as _fail  # type: ignore
-    HAVE_KEYRING = not isinstance(keyring.get_keyring(), _fail.Keyring)
+    _kr = keyring.get_keyring()
+    HAVE_KEYRING = not isinstance(_kr, _fail.Keyring) and "null" not in type(_kr).__module__
 except Exception:  # pragma: no cover
     keyring = None
     HAVE_KEYRING = False
@@ -64,29 +65,100 @@ class SiteStore:
         self.save()
 
 
-def get_password(sid: str) -> str:
-    if not HAVE_KEYRING:
+# --------------------------------------------------------------------------- passwords
+# System keyring (Secret Service: GNOME Keyring / KWallet) when available. Otherwise
+# (python3-keyring missing, no Secret Service running…) fall back to a local file readable
+# only by the user (chmod 600), like WinSCP's own password storage: obfuscated, not encrypted.
+PASSWORDS_FILE = os.path.join(CONFIG_DIR, "passwords.json")
+
+
+def storage_name() -> str:
+    return "keyring" if HAVE_KEYRING else "file"
+
+
+def _key() -> bytes:
+    for p in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        try:
+            with open(p) as f:
+                return (f.read().strip() + "LinSCP").encode()
+        except OSError:
+            pass
+    return b"LinSCP"
+
+
+def _xor(data: bytes) -> bytes:
+    k = _key()
+    return bytes(b ^ k[i % len(k)] for i, b in enumerate(data))
+
+
+def _file_load() -> dict:
+    try:
+        with open(PASSWORDS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _file_save(d: dict):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    tmp = PASSWORDS_FILE + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(d, f)
+    os.replace(tmp, PASSWORDS_FILE)
+
+
+def _file_get(sid):
+    import base64
+    v = _file_load().get(sid)
+    if not v:
         return ""
     try:
-        return keyring.get_password(KEYRING_SERVICE, sid) or ""
+        return _xor(base64.b64decode(v)).decode()
     except Exception:
         return ""
+
+
+def _file_set(sid, pw):
+    import base64
+    d = _file_load()
+    d[sid] = base64.b64encode(_xor(pw.encode())).decode()
+    _file_save(d)
+
+
+def _file_del(sid):
+    d = _file_load()
+    if d.pop(sid, None) is not None:
+        _file_save(d)
+
+
+def get_password(sid: str) -> str:
+    if HAVE_KEYRING:
+        try:
+            pw = keyring.get_password(KEYRING_SERVICE, sid)
+            if pw:
+                return pw
+        except Exception:
+            pass
+    return _file_get(sid)
 
 
 def set_password(sid: str, pw: str) -> bool:
-    if not HAVE_KEYRING:
-        return False
-    try:
-        keyring.set_password(KEYRING_SERVICE, sid, pw)
-        return True
-    except Exception:
-        return False
+    if HAVE_KEYRING:
+        try:
+            keyring.set_password(KEYRING_SERVICE, sid, pw)
+            _file_del(sid)
+            return True
+        except Exception:   # keyring locked / refused: keep it locally instead
+            pass
+    _file_set(sid, pw)
+    return True
 
 
 def delete_password(sid: str):
-    if not HAVE_KEYRING:
-        return
-    try:
-        keyring.delete_password(KEYRING_SERVICE, sid)
-    except Exception:
-        pass
+    if HAVE_KEYRING:
+        try:
+            keyring.delete_password(KEYRING_SERVICE, sid)
+        except Exception:
+            pass
+    _file_del(sid)
