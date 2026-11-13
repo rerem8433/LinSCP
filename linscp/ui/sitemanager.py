@@ -4,9 +4,10 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
                              QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-                             QSpinBox, QToolButton, QVBoxLayout, QWidget)
+                             QToolButton, QVBoxLayout, QWidget)
 
 from ..i18n import tr
 from ..protocols import PROTOCOL_LABELS, PROTOCOLS, Site
@@ -68,11 +69,12 @@ class SiteManager(QDialog):
             self.f_proto.addItem(proto_label(p), p)
         self.f_host = QLineEdit()
         self.f_host.setPlaceholderText("192.168.1.10")
-        self.f_port = QSpinBox()
-        self.f_port.setRange(1, 65535)
-        self.f_port.setValue(22)
-        self.f_port.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        # plain text field (like the quick-connect bar): empty = protocol's default port,
+        # shown as placeholder. A QSpinBox silently refused digits typed after its value.
+        self.f_port = QLineEdit()
+        self.f_port.setValidator(QIntValidator(1, 65535, self.f_port))
         self.f_port.setFixedWidth(80)
+        self.f_port.setToolTip(tr("Port (vide = port par défaut)"))
         hp = QHBoxLayout()
         hp.addWidget(self.f_host, 1)
         hp.addWidget(QLabel(tr("Port")))
@@ -130,7 +132,7 @@ class SiteManager(QDialog):
 
         for w in (self.f_name, self.f_host, self.f_user, self.f_pass, self.f_key, self.f_rdir, self.f_ldir):
             w.textEdited.connect(self._touch)
-        self.f_port.valueChanged.connect(self._touch)
+        self.f_port.textEdited.connect(self._touch)
         self.f_save.toggled.connect(self._touch)
         self.f_passive.toggled.connect(self._touch)
         self.f_proto.currentIndexChanged.connect(self._proto_changed)
@@ -207,7 +209,7 @@ class SiteManager(QDialog):
         self.f_name.setText(s.name)
         self.f_proto.setCurrentIndex(max(0, PROTOCOLS.index(s.protocol) if s.protocol in PROTOCOLS else 0))
         self.f_host.setText(s.host)
-        self.f_port.setValue(s.effective_port())
+        self.f_port.setText(str(s.port) if s.port and s.port != s.default_port() else "")
         self.f_user.setText(s.user)
         self.f_auth.setCurrentIndex(1 if s.auth == "key" else 0)
         self.f_pass.setText(pw)
@@ -227,9 +229,8 @@ class SiteManager(QDialog):
     def _proto_changed(self, *a):
         if not self._loading:
             old = Site(protocol=getattr(self, "_last_proto", "sftp")).default_port()
-            new = Site(protocol=self.f_proto.currentData()).default_port()
-            if self.f_port.value() == old:
-                self.f_port.setValue(new)
+            if self.f_port.text().strip() == str(old):
+                self.f_port.clear()
             self._touch()
         self._last_proto = self.f_proto.currentData()
         self._update_rows()
@@ -241,6 +242,7 @@ class SiteManager(QDialog):
     def _update_rows(self):
         p = self.f_proto.currentData()
         self._last_proto = p
+        self.f_port.setPlaceholderText(str(Site(protocol=p).default_port()))
         ssh = p in ("sftp", "scp")
         key = ssh and self.f_auth.currentData() == "key"
         for w in (self.l_auth, self.f_auth):
@@ -258,7 +260,7 @@ class SiteManager(QDialog):
                  key_file=self.f_key.text().strip(), remote_dir=self.f_rdir.text().strip(),
                  local_dir=self.f_ldir.text().strip(), passive=self.f_passive.isChecked(),
                  save_password=self.f_save.isChecked())
-        port = self.f_port.value()
+        port = int(self.f_port.text().strip() or 0)
         s.port = 0 if port == s.default_port() else port
         s.password = self.f_pass.text()
         return s

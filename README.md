@@ -1,20 +1,13 @@
-<p align="center"># LinSCP</p>
+# LinSCP
 
-<p align="center">**🇫🇷 Client SFTP / SCP / FTP / FTPS natif pour Linux, inspiré de WinSCP.**</p>
-
-<p align="center">**🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**</p>
-
-<p align="center">Thème clair</p>
+**🇫🇷 Client SFTP / SCP / FTP / FTPS natif pour Linux, inspiré de WinSCP.**
+**🇬🇧 Native SFTP / SCP / FTP / FTPS client for Linux, inspired by WinSCP.**
 
 ![LinSCP](docs/screenshot-light.png)
 
-<p align="center">Thème sombre</p>
-
-![LinSCP dark](docs/screenshot-dark.png)
-
 ---
 
-<p align="center">## 🇫🇷 Français</p>
+## 🇫🇷 Français
 
 LinSCP n'est **pas** WinSCP sous Wine : c'est une réécriture complète en Python + Qt 6. Elle garde l'essentiel de WinSCP et laisse de côté le superflu.
 
@@ -31,9 +24,9 @@ LinSCP n'est **pas** WinSCP sous Wine : c'est une réécriture complète en Pyth
 
 ### Installation (Linux Mint 21+ / Ubuntu 22.04+ / Debian 12+)
 ```bash
-sudo apt install ./linscp_1.0.0_all.deb
+sudo apt install ./linscp_1.0.1_all.deb
 ```
-Les dépendances (`python3-pyqt6`, `python3-pyqt6.qtsvg`, `python3-paramiko`, `python3-keyring`) sont installées automatiquement.
+Le .deb est dans les [Releases](https://github.com/rerem8433/LinSCP/releases). Les dépendances (`python3-pyqt6`, `python3-pyqt6.qtsvg`, `python3-paramiko`, `python3-keyring`) sont installées automatiquement.
 
 ### Raccourcis
 | Touche | Action |
@@ -55,7 +48,7 @@ Les dépendances (`python3-pyqt6`, `python3-pyqt6.qtsvg`, `python3-paramiko`, `p
 
 ---
 
-<p align="center">## 🇬🇧 English</p>
+## 🇬🇧 English
 
 LinSCP is **not** WinSCP running in Wine: it is a from-scratch rewrite in Python + Qt 6 that keeps WinSCP's essentials and drops the clutter.
 
@@ -72,7 +65,7 @@ LinSCP is **not** WinSCP running in Wine: it is a from-scratch rewrite in Python
 
 ### Install (Linux Mint 21+ / Ubuntu 22.04+ / Debian 12+)
 ```bash
-sudo apt install ./linscp_1.0.0_all.deb
+sudo apt install ./linscp_1.0.1_all.deb
 ```
 
 ### Build the package
@@ -87,5 +80,9 @@ python3 -m linscp
 ```
 
 ---
+
+![LinSCP dark](docs/screenshot-dark.png)
+
+📋 [CHANGELOG](CHANGELOG.md)
 
 GPL-3.0 · © ParadoxXx Squad · LinSCP is not affiliated with the WinSCP project.
