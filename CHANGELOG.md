@@ -5,31 +5,45 @@ All notable changes to LinSCP are documented here.
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · Versions : [SemVer](https://semver.org/lang/fr/)
 
+## [1.0.5] — 2026-11-13
+
+### 🇫🇷 Corrigé
+- **FTP en mode actif derrière une box / un NAT** (constaté sur un NAS Synology DSM) : quand le serveur ne peut pas se connecter au PC, il envoie deux réponses (« 425 Can't build data connection » puis « 550 Data connection: No route to host »). LinSCP lisait la seconde comme réponse à la commande suivante, et tout se décalait. Désormais, LinSCP rouvre la connexion en mode passif et garde ce mode pour toute la session (navigation et transferts).
+- Même chose pour les serveurs qui répondent d'abord « 150 » puis échouent : LinSCP abandonne le mode actif après 8 s au plus au lieu de rester bloqué 20 s.
+- Listage FTP : sur les serveurs qui refusent `OPTS MLST` (Synology DSM), LinSCP n'abandonne plus MLSD au profit de LIST, ce qui donne des dates et des tailles plus fiables.
+
+### 🇫🇷 Ajouté
+- Mode diagnostic : `LINSCP_DEBUG=1 linscp` affiche dans le terminal tous les échanges FTP (mot de passe masqué).
+
+### 🇬🇧 Fixed
+- **FTP active mode behind a router / NAT** (seen on a Synology DSM NAS): when the server cannot connect to the PC, it sends two replies ("425 Can't build data connection" then "550 Data connection: No route to host"). LinSCP read the second one as the reply to the next command and everything got out of step. LinSCP now reopens the connection in passive mode and keeps that mode for the whole session (browsing and transfers).
+- Same for servers that first answer "150" and then fail: LinSCP gives up active mode after at most 8 s instead of hanging for 20 s.
+- FTP listing: on servers that reject `OPTS MLST` (Synology DSM), LinSCP no longer drops MLSD for LIST, which gives more reliable dates and sizes.
+
+### 🇬🇧 Added
+- Diagnostic mode: `LINSCP_DEBUG=1 linscp` prints every FTP exchange in the terminal (password masked).
+
 ## [1.0.3] — 2026-11-13
 
 ### 🇫🇷 Ajouté
 - Gestionnaire de sites : champ **Notes** libre (plusieurs lignes) sur chaque fiche. Les notes s'affichent au survol d'un site et sont prises en compte par la recherche.
 
 ### 🇫🇷 Corrigé
-- Gestionnaire de sites : la case « Mémoriser le mot de passe » restait grisée quand LinSCP ne trouvait pas le trousseau du système (`python3-keyring` absent ou aucun service Secret Service). Elle est maintenant toujours active.
-- Sans trousseau, le mot de passe est rangé dans `~/.config/linscp/passwords.json` : fichier lisible par l'utilisateur seul (droits 600), mot de passe masqué mais non chiffré, comme le fait WinSCP par défaut.
-- Si le trousseau refuse l'enregistrement (verrouillé…), LinSCP passe aussi par ce fichier.
+- **FTP derrière une box / un NAT** : quand le serveur ne peut pas ouvrir la connexion de données en mode actif, LinSCP bascule maintenant tout seul en mode passif (et inversement si le mode passif échoue). Cela couvre « 425 Can't build data connection », « 550 Data connection: No route to host » et l'attente sans réponse.
+- Gestionnaire de sites, **Port** : on ne pouvait pas taper de port, les chiffres s'ajoutaient après la valeur existante et étaient refusés sans rien afficher. C'est maintenant un champ texte ; vide = port par défaut du protocole, affiché en grisé.
+- Gestionnaire de sites, **Enregistrer** : la fiche était bien sauvegardée, mais la liste n'était pas rafraîchie, si bien que l'enregistrement semblait avoir échoué. Le bouton affiche maintenant « Enregistré ✓ ».
+- Gestionnaire de sites, **Mémoriser le mot de passe** : la case restait grisée sans trousseau système (`python3-keyring` absent ou aucun service Secret Service). Elle est maintenant toujours active. Sans trousseau, le mot de passe est rangé dans `~/.config/linscp/passwords.json` : fichier lisible par l'utilisateur seul (droits 600), mot de passe masqué mais non chiffré, comme le fait WinSCP par défaut.
 - Paquet : `python3-secretstorage` et `gnome-keyring` / `kwalletmanager` ajoutés aux paquets recommandés.
-- Gestionnaire de sites : le bouton **Enregistrer** sauvegardait bien la fiche, mais la liste n'était pas rafraîchie, si bien que l'enregistrement semblait avoir échoué. Le bouton affiche maintenant « Enregistré ✓ ».
-- FTP : l'erreur « 425 Can't build data connection » apparaissait quand le serveur ne peut pas joindre le PC en mode actif (NAT, box). LinSCP bascule maintenant tout seul en mode passif, et inversement si le mode passif échoue.
-- Gestionnaire de sites : il était impossible de taper un port dans le champ « Port ». Les chiffres s'ajoutaient après la valeur existante et étaient refusés sans rien afficher. C'est maintenant un champ texte, comme dans la connexion rapide. Vide = port par défaut du protocole, affiché en grisé.
 
 ### 🇬🇧 Added
 - Site manager: free multi-line **Notes** field on each entry. Notes show in the site tooltip and are matched by the search box.
 
 ### 🇬🇧 Fixed
-- Site manager: "Remember password" stayed greyed out when LinSCP found no system keyring (`python3-keyring` missing or no Secret Service running). It is now always enabled.
-- Without a keyring, the password is kept in `~/.config/linscp/passwords.json`: file readable by the user only (mode 600), password obfuscated but not encrypted, as WinSCP does by default.
-- If the keyring refuses to store it (locked…), LinSCP also falls back to that file.
+- **FTP behind a router / NAT**: when the server cannot open the data connection in active mode, LinSCP now switches to passive mode automatically (and back to active if passive fails). This covers "425 Can't build data connection", "550 Data connection: No route to host" and the case where nothing answers.
+- Site manager, **Port**: a port could not be typed, digits were appended after the existing value and silently rejected. It is now a text field; empty = the protocol's default port, shown as a placeholder.
+- Site manager, **Save**: the entry was stored, but the list was never refreshed, so saving looked like it had failed. The button now shows "Saved ✓".
+- Site manager, **Remember password**: the box stayed greyed out without a system keyring (`python3-keyring` missing or no Secret Service running). It is now always enabled. Without a keyring, the password is kept in `~/.config/linscp/passwords.json`: file readable by the user only (mode 600), password obfuscated but not encrypted, as WinSCP does by default.
 - Package: `python3-secretstorage` and `gnome-keyring` / `kwalletmanager` added to Recommends.
-- Site manager: **Save** did store the entry but never refreshed the list, so saving looked like it had failed. The button now shows "Saved ✓".
-- FTP: the "425 Can't build data connection" error appeared when the server cannot reach the PC in active mode (NAT, ISP box). LinSCP now switches to passive mode automatically, and back to active if passive fails.
-- Site manager: a port could not be typed into the "Port" field. Digits were appended after the existing value and silently rejected. It is now a plain text field, as in the quick-connect bar. Empty = the protocol's default port, shown as a placeholder.
 
 ## [1.0.0] — 2026-10-31
 
@@ -86,5 +100,6 @@ Première version publique. / First public release.
 - FTPS implicite pas encore testé contre un vrai serveur. / Implicit FTPS not yet tested against a real server.
 - Le changement de langue et de thème est complet au redémarrage. / Language and theme changes fully apply after a restart.
 
+[1.0.5]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.5
 [1.0.3]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.3
 [1.0.0]: https://github.com/rerem8433/LinSCP/releases/tag/v1.0.0

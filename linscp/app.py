@@ -7,7 +7,10 @@ import sys
 def main():
     from PyQt6.QtWidgets import QApplication
 
-    from . import APP_NAME
+    import os
+    from . import APP_NAME, __version__
+    if os.environ.get("LINSCP_DEBUG"):
+        print(f"[linscp] LinSCP {__version__} — mode diagnostic", flush=True)
     from .config import settings
     from .ui import icons, theme
 

@@ -12,6 +12,13 @@ import ssl
 import time
 
 from ..config import CONFIG_DIR
+
+DEBUG = bool(os.environ.get("LINSCP_DEBUG"))
+
+
+def _dbg(msg):
+    if DEBUG:
+        print(f"[linscp] {msg}", flush=True)
 from .base import CHUNK, Entry, RemoteFS
 from .scp import parse_ls_line
 
@@ -29,29 +36,69 @@ def _tls_context() -> ssl.SSLContext:
     return ctx
 
 
+def _data_refused(e) -> bool:
+    """Server-side failure to open the data connection (active mode behind NAT/box):
+    425 Can't open data connection, 426, or 550 "Data connection: No route to host"."""
+    if not isinstance(e, ftplib.Error):
+        return False
+    msg = str(e)
+    code = msg[:3]
+    low = msg.lower()
+    return code == "425" or (code in ("426", "550") and ("data connection" in low or "route to host" in low
+                                                           or "connection refused" in low))
+
+
+ACTIVE_ACCEPT_TIMEOUT = 8   # seconds to wait for the server to connect back in active mode
+
+
+class ModeFailure(OSError):
+    """Active-mode data connection failed after the server had already answered "150":
+    the control channel may hold a late reply, so the connection must be reopened."""
+
+
 def _open_data(ftp, cmd, rest=None):
-    """Open the data connection. If the server answers 425 (it cannot reach us in active
-    mode, or our passive connection failed), switch active <-> passive once and retry."""
+    """Open the data connection. When the failure is clean (the server refused before
+    starting the transfer, or our passive connect failed) switch to active in place;
+    otherwise raise ModeFailure so FTPFS reconnects in passive mode."""
     try:
         return ftplib.FTP.ntransfercmd(ftp, cmd, rest)
-    except (ftplib.error_temp, OSError) as e:
+    except (ftplib.Error, OSError) as e:
+        _dbg(f"{cmd}: {e!r} (passive={ftp.passiveserver}, already switched={getattr(ftp, '_mode_switched', False)})")
         if getattr(ftp, "_mode_switched", False):
             raise
-        refused_active = isinstance(e, ftplib.error_temp) and str(e).startswith("425")
-        failed_passive = not isinstance(e, ftplib.Error) and ftp.passiveserver
-        if not (refused_active or failed_passive):
-            raise
+        if ftp.passiveserver:
+            if isinstance(e, ftplib.Error):
+                raise
+        else:
+            if not isinstance(e, ftplib.Error):
+                # timed out waiting for the server (it said 150, then failed): channel desynced
+                raise ModeFailure(f"{e} (active mode)") from e
+            if not _data_refused(e):
+                raise
+            # Some servers (Synology DSM / ProFTPD) send a SECOND reply after the refusal
+            # ("425 Can't build…" then "550 Data connection: …"): the control channel can't be
+            # trusted any more, so let FTPFS reopen the connection in passive mode.
+            raise ModeFailure(f"{e} (active mode)") from e
+        _dbg(f"data connection failed in {'passive' if ftp.passiveserver else 'active'} mode: "
+             f"{e!r} -> switching mode in place")
         ftp._mode_switched = True
         ftp.set_pasv(not ftp.passiveserver)
         return ftplib.FTP.ntransfercmd(ftp, cmd, rest)
 
 
-class _PlainFTP(ftplib.FTP):
+class _ShortAccept:
+    def makeport(self):
+        sock = super().makeport()
+        sock.settimeout(ACTIVE_ACCEPT_TIMEOUT)
+        return sock
+
+
+class _PlainFTP(_ShortAccept, ftplib.FTP):
     def ntransfercmd(self, cmd, rest=None):
         return _open_data(self, cmd, rest)
 
 
-class _ExplicitTLS(ftplib.FTP_TLS):
+class _ExplicitTLS(_ShortAccept, ftplib.FTP_TLS):
     def ntransfercmd(self, cmd, rest=None):
         # Reuse the control-channel TLS session on data channels (vsftpd/ProFTPD require it)
         conn, size = _open_data(self, cmd, rest)
@@ -122,6 +169,9 @@ class FTPFS(RemoteFS):
         else:
             ftp = _ImplicitTLS(context=_tls_context(), timeout=20)
         ftp.encoding = "utf-8"
+        if DEBUG:
+            ftp.set_debuglevel(1)   # prints every command/reply (password masked by ftplib)
+            _dbg(f"connect {s.host}:{s.effective_port()} protocol={proto} passive={s.passive}")
         ftp.connect(s.host, s.effective_port())
         if proto == "ftps":
             ftp.auth()
@@ -181,7 +231,7 @@ class FTPFS(RemoteFS):
         self.ftp.cwd(path)
         return self.ftp.pwd()
 
-    def listdir(self, path):
+    def _listdir(self, path):
         if "MLSD" in self.feat or "MLST" in self.feat:
             try:
                 return self._mlsd(path)
@@ -201,6 +251,36 @@ class FTPFS(RemoteFS):
                 e.is_dir = self._is_dir(posixpath.join(path, e.name))
         return out
 
+    # ---- data commands: on an active-mode failure, reopen the connection in passive mode
+    def _data(self, fn, *args):
+        try:
+            return fn(*args)
+        except (ModeFailure, ftplib.error_reply, ftplib.error_temp, ftplib.error_perm) as e:
+            mode_problem = isinstance(e, (ModeFailure, ftplib.error_reply)) or \
+                (not self.ftp.passiveserver and _data_refused(e))
+            if not mode_problem:
+                _dbg(f"{e!r}: not treated as a mode problem (passive={self.ftp.passiveserver})")
+                raise
+            # active mode is blocked (NAT / box) and the control channel may be out of sync:
+            # reopen the connection in passive mode, remember it, and retry once
+            try:
+                self.ftp.close()
+            except Exception:
+                pass
+            _dbg(f"{e!r} -> reopening the connection in passive mode")
+            self.site.passive = True       # kept for this session and its transfers
+            self.connect()
+            return fn(*args)
+
+    def listdir(self, path):
+        return self._data(self._listdir, path)
+
+    def download(self, remote, local, progress, offset=0):
+        return self._data(self._download, remote, local, progress, offset)
+
+    def upload(self, local, remote, progress, offset=0):
+        return self._data(self._upload, local, remote, progress, offset)
+
     def _is_dir(self, p):
         try:
             cur = self.ftp.pwd()
@@ -212,8 +292,18 @@ class FTPFS(RemoteFS):
 
     def _mlsd(self, path):
         out = []
-        for name, f in self.ftp.mlsd(path, facts=["type", "size", "modify", "unix.mode",
-                                                  "unix.owner", "unix.group", "unix.uid", "unix.gid"]):
+        facts = ["type", "size", "modify", "unix.mode", "unix.owner", "unix.group", "unix.uid", "unix.gid"]
+        rows = None
+        if not getattr(self, "_no_mlst_opts", False):
+            try:
+                rows = list(self.ftp.mlsd(path, facts=facts))
+            except ftplib.error_perm as e:
+                if not str(e).startswith("501"):
+                    raise
+                self._no_mlst_opts = True   # DSM: "501 OPTS command is not defined for MLST"
+        if rows is None:
+            rows = list(self.ftp.mlsd(path))   # server's default facts
+        for name, f in rows:
             t = f.get("type", "").lower()
             if t in ("cdir", "pdir") or name in (".", ".."):
                 continue
@@ -263,7 +353,7 @@ class FTPFS(RemoteFS):
             except ftplib.all_errors:
                 pass
 
-    def download(self, remote, local, progress, offset=0):
+    def _download(self, remote, local, progress, offset=0):
         done = [offset]
         with open(local, "r+b" if offset else "wb") as lf:
             if offset:
@@ -276,7 +366,7 @@ class FTPFS(RemoteFS):
                 progress(done[0])
             self.ftp.retrbinary(f"RETR {remote}", cb, CHUNK, rest=offset or None)
 
-    def upload(self, local, remote, progress, offset=0):
+    def _upload(self, local, remote, progress, offset=0):
         done = [offset]
 
         def cb(data):
